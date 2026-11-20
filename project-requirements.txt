@@ -1,0 +1,20 @@
+1. Design and implement a piece of software to encrypt and decrypt data by using modern
+cryptography algorithms.
+
+2. Demonstrate that your software application can encrypt and decrypt data correctly.
+
+3. The project focuses on functionality rather than security. That is, the key sizes for both
+symmetric key and asymmetric key algorithms do not require the practical length.
+
+4. The software application can use APIs provided by venders or OS to achieve encryption
+and decryption. It is not necessary to design and develop the algorithm from scratch for
+encryption and decryption.
+
+5. Software re-engineering is permitted. If you choose re-engineering, you must understand
+the code and explain the source code correctly during the project presentation.
+
+6. Compiler languages (C/C++, Java, C#) are preferred. But scripting languages are
+acceptable.
+
+7. If you use compiler languages (C/C++, C#) rather than scripting languages for the project,
+then your group will receive additional 5% bonus grades.
