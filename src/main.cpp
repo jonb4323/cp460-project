@@ -87,10 +87,7 @@ int gcm_encrypt() {
     if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad.data(), static_cast<int>(aad.size())))
         handleErrors();
 
-    /* 
-    Provide the message to be encrypted, and obtain the encrypted output.
-    EVP_EncryptUpdate can be called multiple times if necessary
-    */
+    /* Provide the message to be encrypted, and obtain the encrypted output. EVP_EncryptUpdate can be called multiple times if necessary. */
     if(!plaintext.empty()) {
         if(1 != EVP_EncryptUpdate(ctx, ciphertext.data(), &len, plaintext.data(), static_cast<int>(plaintext.size())))
             handleErrors();
@@ -146,10 +143,7 @@ int gcm_decrypt() {
             handleErrors();
     }
 
-    /*
-    * Provide the message to be decrypted, and obtain the plaintext output.
-    * EVP_DecryptUpdate can be called multiple times if necessary
-    */
+    /* Provide the message to be decrypted, and obtain the plaintext output. EVP_DecryptUpdate can be called multiple times if necessary. */
     if(!ciphertext.empty()) {
         if(!EVP_DecryptUpdate(ctx, decryptedtext.data(), &len, ciphertext.data(), static_cast<int>(ciphertext.size())))
             handleErrors();
@@ -193,12 +187,9 @@ int main() {
 
     // decrypt
     if (gcm_decrypt() >= 0) {
-        cout << "\nDecrypted  : " << toString(decryptedtext) << endl;
-        cout << (decryptedtext == plaintext ? "Round trip OK: matches original" 
-                                            : "MISMATCH") << endl;
-    } else {
-        cout << "Decryption failed (authentication error)" << endl;
-    }
+        cout << "\nDecrypted: " << toString(decryptedtext) << endl;
+        cout << (decryptedtext == plaintext ? "Round trip OK: matches original" : "MISMATCH") << endl;
+    } else { cout << "Decryption failed (authentication error)" << endl; }
 
     /*
     // testing
