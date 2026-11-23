@@ -16,10 +16,12 @@ constexpr size_t IV_LEN = 1; // 2^8 security is not the focus
 constexpr size_t TAG_LEN = 16; // 128 bit auth tag length
 
 vector<uint8_t> plaintext; // data the user typed in
-vector<uint8_t> key; // 32-byte AES key
+vector<uint8_t> key; // 16 byte AES key
 vector<uint8_t> iv; // 2^8
 vector<uint8_t> aad; // additional authenticated data
 vector<uint8_t> ciphertext; // output of encrypt  
+vector<uint8_t> tag; // 16 byte authentication tag
+vector<uint8_t> decryptedtext; // output of decrypt
     
 void handleErrors() { // unexpected error handling
     ERR_print_errors_fp(stderr);
@@ -37,7 +39,7 @@ string toString(const vector<uint8_t>& v) {
 void getDataToEncrypt() { // get data from user
     cout << "Enter data to encrypt: ";
     string input;
-    getline(cin, input); // use getline to read the entire line
+    getline(cin, input); // read the entire line
     plaintext = stringToBytes(input);
 }
 
@@ -70,7 +72,7 @@ int gcm_encrypt() {
         handleErrors();
 
     /* Initialise the encryption operation. */
-    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL))
+    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_gcm(), NULL, NULL, NULL))
         handleErrors();
 
     /* Set IV length if default 12 bytes (96 bits) is not appropriate */
@@ -127,7 +129,7 @@ int gcm_decrypt() {
         handleErrors();
 
     /* Initialise the decryption operation. */
-    if(!EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL))
+    if(!EVP_DecryptInit_ex(ctx, EVP_aes_128_gcm(), NULL, NULL, NULL))
         handleErrors();
 
     /* Set IV length. Not necessary if this is 12 bytes (96 bits) */
@@ -172,6 +174,7 @@ int gcm_decrypt() {
 }
 
 int main() {
+    bool testEnabled = false;
     getDataToEncrypt(); // gather data from user to encrypt
 
     // need to generate the fresh key and iv for each run
@@ -189,12 +192,21 @@ int main() {
     // decrypt
     if (gcm_decrypt() >= 0) {
         cout << "\nDecrypted: " << toString(decryptedtext) << endl;
-        cout << (decryptedtext == plaintext ? "Round trip OK: matches original" : "MISMATCH") << endl;
+        cout << (decryptedtext == plaintext ? "Does the plaintext match in -> out?: matches original" : "MISMATCH") << endl;
     } else { cout << "Decryption failed (authentication error)" << endl; }
 
     /*
     // testing
-    if (test_enabled) {
+    Testing Types:
+    key, iv, aad, plaintext, tag and ciphertext, runs gcm_encrypt() or gcm_decrypt(), and print debug output to terminal
+    Correctness (round trips)
+    Format and sizes
+    Randomness (fresh iv)
+    Standards conformance (known-answer test)
+    Integrity (tamper, wrong key/iv/aad)
+    Edge cases
+
+    if (testEnabled) {
         run_tests();
     } */
 
