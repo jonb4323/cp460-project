@@ -11,17 +11,15 @@
 
 using namespace std;
 
-constexpr size_t KEY_LEN = 32; // AES 256 key length
-constexpr size_t IV_LEN = 12; // 96 bit nonce length (default for GCM)
+constexpr size_t KEY_LEN = 16; // AES 128 key length
+constexpr size_t IV_LEN = 1; // 2^8 security is not the focus
 constexpr size_t TAG_LEN = 16; // 128 bit auth tag length
 
 vector<uint8_t> plaintext; // data the user typed in
-vector<uint8_t> key; // 32-byte AES key (random)
-vector<uint8_t> iv; // 12-byte IV (random, new per message)
+vector<uint8_t> key; // 32-byte AES key
+vector<uint8_t> iv; // 2^8
 vector<uint8_t> aad; // additional authenticated data
-vector<uint8_t> ciphertext; // output of encrypt
-vector<uint8_t> tag; // 16-byte authentication tag
-vector<uint8_t> decryptedtext; // output of decrypt
+vector<uint8_t> ciphertext; // output of encrypt  
     
 void handleErrors() { // unexpected error handling
     ERR_print_errors_fp(stderr);
@@ -83,9 +81,12 @@ int gcm_encrypt() {
     if(1 != EVP_EncryptInit_ex(ctx, NULL, NULL, key.data(), iv.data()))
         handleErrors();
 
+
     /* Provide any AAD data. This can be called zero or more times as required */
-    if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad.data(), static_cast<int>(aad.size())))
-        handleErrors();
+    if (!aad.empty()) {
+        if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad.data(), static_cast<int>(aad.size())))
+            handleErrors();
+    }
 
     /* Provide the message to be encrypted, and obtain the encrypted output. EVP_EncryptUpdate can be called multiple times if necessary. */
     if(!plaintext.empty()) {
