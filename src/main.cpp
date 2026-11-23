@@ -173,8 +173,75 @@ int gcm_decrypt() {
     }
 }
 
-int main() {
-    bool testEnabled = false;
+// testing
+int passed = 0, failed = 0;
+
+void check(bool ok, string name) {
+    if (ok) passed++; else failed++;
+    cout << (ok ? "PASS: " : "FAIL: ") << name << endl;
+}
+
+// new random key + iv each time, then encrypt
+void encryptFresh(string msg) {
+    plaintext = stringToBytes(msg);
+    key = randomBytes(KEY_LEN);
+    iv = randomBytes(IV_LEN);
+    aad = stringToBytes("cp460-project");
+    gcm_encrypt();
+}
+
+void run_tests() {
+    // round trip
+    encryptFresh("hello cp460");
+    check(gcm_decrypt() >= 0 && toString(decryptedtext) == "hello cp460", "round trip");
+
+    // sizes
+    check(key.size() == 16 && tag.size() == 16, "key and tag are 16 bytes");
+    check(ciphertext.size() == plaintext.size(), "ciphertext same length as plaintext");
+
+    // known answer test (NIST GCM test case 2, zero key / zero 96 bit iv)
+    key.assign(16, 0);
+    iv.assign(12, 0);
+    aad.clear();
+    plaintext.assign(16, 0);
+    gcm_encrypt();
+    check(bytesToHex(ciphertext) == "0388dace60b6a392f328c2b971b2fe78" &&
+          bytesToHex(tag) == "ab6e47d42cec13bdf53a67b21257bddf", "NIST known answer test");
+
+    // tampering should make decrypt fail
+    encryptFresh("dont change me");
+    ciphertext[0] ^= 1;
+    check(gcm_decrypt() < 0, "modified ciphertext rejected");
+
+    encryptFresh("dont change me");
+    tag[0] ^= 1;
+    check(gcm_decrypt() < 0, "modified tag rejected");
+
+    encryptFresh("dont change me");
+    key = randomBytes(KEY_LEN);
+    check(gcm_decrypt() < 0, "wrong key rejected");
+
+    encryptFresh("dont change me");
+    aad = stringToBytes("wrong aad");
+    check(gcm_decrypt() < 0, "wrong aad rejected");
+
+    // edge cases
+    encryptFresh("");
+    check(gcm_decrypt() >= 0 && decryptedtext.empty(), "empty input");
+
+    encryptFresh(string(10000, 'a'));
+    check(gcm_decrypt() >= 0 && decryptedtext == plaintext, "large input (10000 bytes)");
+
+    cout << "\n" << passed << " passed, " << failed << " failed" << endl;
+}
+
+int main(int argc, char* argv[]) {
+    // ./cp460.exe test  -> runs the tests instead
+    if (argc > 1 && string(argv[1]) == "test") {
+        run_tests();
+        return 0;
+    }
+
     getDataToEncrypt(); // gather data from user to encrypt
 
     // need to generate the fresh key and iv for each run
@@ -195,20 +262,6 @@ int main() {
         cout << (decryptedtext == plaintext ? "Does the plaintext match in -> out?: matches original" : "MISMATCH") << endl;
     } else { cout << "Decryption failed (authentication error)" << endl; }
 
-    /*
-    // testing
-    Testing Types:
-    key, iv, aad, plaintext, tag and ciphertext, runs gcm_encrypt() or gcm_decrypt(), and print debug output to terminal
-    Correctness (round trips)
-    Format and sizes
-    Randomness (fresh iv)
-    Standards conformance (known-answer test)
-    Integrity (tamper, wrong key/iv/aad)
-    Edge cases
-
-    if (testEnabled) {
-        run_tests();
-    } */
 
     return 0;
-}
+}
