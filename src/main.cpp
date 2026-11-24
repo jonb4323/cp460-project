@@ -12,12 +12,12 @@
 using namespace std;
 
 constexpr size_t KEY_LEN = 16; // AES 128 key length
-constexpr size_t IV_LEN = 1; // 2^8 security is not the focus
+constexpr size_t IV_LEN = 1; // (2^8) shortened on purpose for readability (default = 12)
 constexpr size_t TAG_LEN = 16; // 128 bit auth tag length
 
 vector<uint8_t> plaintext; // data the user typed in
 vector<uint8_t> key; // 16 byte AES key
-vector<uint8_t> iv; // 2^8
+vector<uint8_t> iv; // 8 bit
 vector<uint8_t> aad; // additional authenticated data
 vector<uint8_t> ciphertext; // output of encrypt  
 vector<uint8_t> tag; // 16 byte authentication tag
@@ -176,12 +176,12 @@ int gcm_decrypt() {
 // testing
 int passed = 0, failed = 0;
 
-void check(bool ok, string name) {
+string check(bool ok) {
     if (ok) passed++; else failed++;
-    cout << (ok ? "PASS: " : "FAIL: ") << name << endl;
+    return (ok ? "[PASS] " : "[FAIL] ");
 }
 
-// new random key + iv each time, then encrypt
+// fresh test load
 void encryptFresh(string msg) {
     plaintext = stringToBytes(msg);
     key = randomBytes(KEY_LEN);
@@ -191,52 +191,131 @@ void encryptFresh(string msg) {
 }
 
 void run_tests() {
-    // round trip
-    encryptFresh("hello cp460");
-    check(gcm_decrypt() >= 0 && toString(decryptedtext) == "hello cp460", "round trip");
+    // TEST 1: in/out match
+    cout << "===TEST 1: Data in == Data out===\n\n";
+    cout << "[Data In]: SECRET KEY is 9404\n";
 
-    // sizes
-    check(key.size() == 16 && tag.size() == 16, "key and tag are 16 bytes");
-    check(ciphertext.size() == plaintext.size(), "ciphertext same length as plaintext");
+    encryptFresh("SECRET KEY is 9404");                                                                                                                                                                                                                         
+    string test1_status = check(gcm_decrypt() >= 0 && toString(decryptedtext) == "SECRET KEY is 9404");
 
-    // known answer test (NIST GCM test case 2, zero key / zero 96 bit iv)
+    cout << "[Data Out]: " + toString(decryptedtext) + "\n";
+    cout << "\nVerifying...\n\n";
+    cout << "TEST 1 STATUS: " + test1_status + "\n";
+
+    // TEST 2: sizes
+    cout << "\n===TEST 2: Key & Tag == 16 bytes & length cipher == length plaintext===\n\n";
+
+    string test2_status_1 = check(key.size() == 16 && tag.size() == 16);
+    string test2_status_2 = check(ciphertext.size() == plaintext.size());
+
+    cout << "Verifying...\n\n";
+    cout << "TEST 2.1 STATUS: " + test2_status_1 + "\n";
+    cout << "TEST 2.2 STATUS: " + test2_status_2 + "\n";
+
+    // TEST 3: expected output
+    cout << "\n===TEST 3: Expected Output, matches NIST known anwser===\n\n";
+    cout << "Assigning new values...\n";
+
     key.assign(16, 0);
     iv.assign(12, 0);
     aad.clear();
     plaintext.assign(16, 0);
-    gcm_encrypt();
-    check(bytesToHex(ciphertext) == "0388dace60b6a392f328c2b971b2fe78" &&
-          bytesToHex(tag) == "ab6e47d42cec13bdf53a67b21257bddf", "NIST known answer test");
 
-    // tampering should make decrypt fail
+    cout << "Encrypting...\n";
+
+    gcm_encrypt();
+    string test3_status = check(bytesToHex(ciphertext) == "0388dace60b6a392f328c2b971b2fe78" && bytesToHex(tag) == "ab6e47d42cec13bdf53a67b21257bddf");
+
+    cout << "\nVerifying...\n\n";
+    cout << "TEST 3 STATUS: " + test3_status + "\n";
+
+    // TEST 4: tampering
+    cout << "\n===TEST 4: Tampering===\n\n";
     encryptFresh("dont change me");
+    cout << "[Control]: untouched ciphertext and tag should decrypt";
+    string test4_status_1 = check(gcm_decrypt() >= 0);
+
     ciphertext[0] ^= 1;
-    check(gcm_decrypt() < 0, "modified ciphertext rejected");
+    cout << "\n[Flip 1 bit of the ciphertext]: tag no longer matches";
+    string test4_status_2 = check(gcm_decrypt() < 0);
 
     encryptFresh("dont change me");
     tag[0] ^= 1;
-    check(gcm_decrypt() < 0, "modified tag rejected");
+    cout << "\n[Flip 1 bit of the auth tag]: continuing...";
+    string test4_status_3 = check(gcm_decrypt() < 0);
+
+    encryptFresh("dont change me");
+    iv[0] ^= 1;
+    cout << "\n[Flip 1 bit of the IV]: wrong keystream and tag";
+    string test4_status_4 = check(gcm_decrypt() < 0);
 
     encryptFresh("dont change me");
     key = randomBytes(KEY_LEN);
-    check(gcm_decrypt() < 0, "wrong key rejected");
+    cout << "\n[Decrypt with a different key]: continuing...";
+    string test4_status_5 = check(gcm_decrypt() < 0);
 
     encryptFresh("dont change me");
     aad = stringToBytes("wrong aad");
-    check(gcm_decrypt() < 0, "wrong aad rejected");
+    cout << "\n[Decrypt with different AAD]: continuing...\n";
+    string test4_status_6 = check(gcm_decrypt() < 0);
 
-    // edge cases
-    encryptFresh("");
-    check(gcm_decrypt() >= 0 && decryptedtext.empty(), "empty input");
+    cout << "\nVerifying...\n\n";
+    cout << "TEST 4.1 STATUS: " + test4_status_1 + "\n";
+    cout << "TEST 4.2 STATUS: " + test4_status_2 + "\n";
+    cout << "TEST 4.3 STATUS: " + test4_status_3 + "\n";
+    cout << "TEST 4.4 STATUS: " + test4_status_4 + "\n";
+    cout << "TEST 4.5 STATUS: " + test4_status_5 + "\n";
+    cout << "TEST 4.6 STATUS: " + test4_status_6 + "\n";
 
-    encryptFresh(string(10000, 'a'));
-    check(gcm_decrypt() >= 0 && decryptedtext == plaintext, "large input (10000 bytes)");
+    // TEST 5: verifying the key, i/o and iv
+    cout << "\n===TEST 5: Verifying Key, I/O and IV===\n\n";
+    key.assign(16, 7); iv.assign(1, 5);
+    aad = stringToBytes("cp460-project");
+    plaintext = stringToBytes("same input");
 
-    cout << "\n" << passed << " passed, " << failed << " failed" << endl;
+    gcm_encrypt();
+    vector<uint8_t> c1 = ciphertext, t1 = tag;
+    gcm_encrypt();
+
+    cout << "[Same key, IV and input encrypted twice]: output should be identical\n";
+    string test5_status_1 = check(ciphertext == c1 && tag == t1);
+
+    iv[0] = 6;
+    gcm_encrypt();
+    cout << "[Change only the IV]: ciphertext and tag should both change\n";
+    string test5_status_2 = check(ciphertext != c1 && tag != t1 && ciphertext.size() == c1.size());
+
+    cout << "\nVerifying...\n\n";
+    cout << "TEST 5.1 STATUS: " + test5_status_1 + "\n";
+    cout << "TEST 5.2 STATUS: " + test5_status_2 + "\n";
+
+    // TEST 6: edge cases
+    cout << "\n===TEST 6: Edge Cases===\n\n";
+    encryptFresh("a");
+    cout << "[Smallest message 1 byte]: should decrypt back to the original\n";
+
+    string test6_status_1 = check(gcm_decrypt() >= 0 && decryptedtext == plaintext);
+
+    string bin;
+    for (int i = 0; i < 256; i++) bin.push_back(static_cast<char>(i));
+
+    encryptFresh(bin);
+    cout << "[Binary data all 256 byte values]: should decrypt back to the original\n";
+
+    string test6_status_2 = check(gcm_decrypt() >= 0 && decryptedtext == plaintext);
+
+    cout << "\nVerifying...\n\n";
+    cout << "TEST 6.1 STATUS: " + test6_status_1 + "\n";
+    cout << "TEST 6.2 STATUS: " + test6_status_2 + "\n";
+
+    // test summary
+    cout << "\nTest Summary: " << passed << " passed, " << failed << " failed" << endl;
 }
 
 int main(int argc, char* argv[]) {
-    // ./cp460.exe test  -> runs the tests instead
+    cout << "\n=========================================\n";
+
+    // ./main.exe test
     if (argc > 1 && string(argv[1]) == "test") {
         run_tests();
         return 0;
@@ -262,6 +341,6 @@ int main(int argc, char* argv[]) {
         cout << (decryptedtext == plaintext ? "Does the plaintext match in -> out?: matches original" : "MISMATCH") << endl;
     } else { cout << "Decryption failed (authentication error)" << endl; }
 
-
+    cout << "=========================================\n\n";
     return 0;
-}
+}
